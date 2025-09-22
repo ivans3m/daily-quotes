@@ -44,7 +44,7 @@ add_action( 'init', 'dq_register_cpts' );
  * Meta box to assign an Item to a Set and manage ordering help.
  */
 function dq_item_add_meta_boxes() {
-	add_meta_box( 'dq_item_set', __( 'Select Set', 'daily-quotes' ), 'dq_item_set_metabox', 'dq_item', 'side', 'default' );
+	add_meta_box( 'dq_item_set', __( 'Daily Set & Position', 'daily-quotes' ), 'dq_item_set_metabox', 'dq_item', 'side', 'default' );
 }
 add_action( 'add_meta_boxes', 'dq_item_add_meta_boxes' );
 
@@ -62,12 +62,15 @@ function dq_item_set_metabox( $post ) {
 	) );
 
 	echo '<p><label for="dq_set_id"><strong>' . esc_html__( 'Set', 'daily-quotes' ) . '</strong></label></p>';
-	echo '<select name="dq_set_id" id="dq_set_id" class="">';
-	echo '<option value="" disabled>' . esc_html__( '— Select a Set —', 'daily-quotes' ) . '</option>';
+	echo '<select name="dq_set_id" id="dq_set_id" class="widefat">';
+	echo '<option value="">' . esc_html__( '— Select a Set —', 'daily-quotes' ) . '</option>';
 	foreach ( $sets as $set ) {
 		printf( '<option value="%1$d" %2$s>%3$s</option>', $set->ID, selected( $selected_set, $set->ID, false ), esc_html( get_the_title( $set ) ) );
 	}
 	echo '</select>';
+
+	echo '<p style="margin-top:10px;"><strong>' . esc_html__( 'Position in Set', 'daily-quotes' ) . '</strong><br />';
+	echo esc_html__( 'Use "Order" field under Page Attributes to arrange.', 'daily-quotes' ) . '</p>';
 }
 
 function dq_item_save_post( $post_id, $post ) {
@@ -205,10 +208,10 @@ function dq_admin_enqueue( $hook ) {
 		wp_enqueue_script( 'jquery-ui-sortable' );
 		wp_enqueue_script( 'dq-admin-order', DQ_PLUGIN_URL . 'assets/admin-order.js', array( 'jquery', 'jquery-ui-sortable' ), '0.2.0', true );
         wp_localize_script( 'dq-admin-order', 'DQOrder', array(
-			'nonce' => wp_create_nonce( 'dq_order_nonce' ),
-			'ajax' => admin_url( 'admin-ajax.php' ),
+            'nonce' => wp_create_nonce( 'dq_order_nonce' ),
+            'ajax' => admin_url( 'admin-ajax.php' ),
             'toggleNonce' => wp_create_nonce( 'dq_toggle_shown' )
-		) );
+        ) );
 	}
 }
 add_action( 'admin_enqueue_scripts', 'dq_admin_enqueue' );
@@ -308,46 +311,97 @@ function dq_register_admin_menu() {
 }
 add_action( 'admin_menu', 'dq_register_admin_menu' );
 
+/**
+ * Render about page by reading README.md content
+ */
 function dq_render_about_page() {
 	if ( ! current_user_can( 'edit_posts' ) ) { return; }
+	
+	// Get plugin info
 	if ( ! function_exists( 'get_plugin_data' ) ) { require_once ABSPATH . 'wp-admin/includes/plugin.php'; }
 	$plugin = get_plugin_data( DQ_PLUGIN_FILE, false, false );
 	$version = isset( $plugin['Version'] ) ? $plugin['Version'] : '';
 	$author = isset( $plugin['AuthorName'] ) && $plugin['AuthorName'] ? $plugin['AuthorName'] : ( isset( $plugin['Author'] ) ? wp_strip_all_tags( $plugin['Author'] ) : '' );
-	$last_updated = current_time( 'Y-m-d' );
+	
+	// Read README.md content
+	$readme_path = DQ_PLUGIN_DIR . 'README.md';
+	$readme_content = '';
+	if ( file_exists( $readme_path ) ) {
+		$readme_content = file_get_contents( $readme_path );
+	}
+	
+	// If README doesn't exist, show fallback content
+	if ( empty( $readme_content ) ) {
+		$readme_content = "# Daily Quotes WordPress Plugin\n\nPlugin documentation not available.";
+	}
+	
+	// Convert Markdown to HTML (basic conversion)
+	$html_content = dq_convert_markdown_to_html( $readme_content );
+	
 	?>
 	<div class="wrap">
-		<h1><?php echo esc_html__( 'Dailies — Daily Quotes', 'daily-quotes' ); ?></h1>
-		<p><?php echo esc_html__( 'Display non‑repeating daily text or HTML from named sets, via Gutenberg block or shortcode. Rotation avoids repeats until all items are shown; optionally pin one item per day site‑wide.', 'daily-quotes' ); ?></p>
-
-		<h2><?php echo esc_html__( 'How it works', 'daily-quotes' ); ?></h2>
-		<ol>
-			<li><?php echo esc_html__( 'Create a Set under Daily Sets.', 'daily-quotes' ); ?></li>
-			<li><?php echo esc_html__( 'Create Items under Daily Items and assign them to a Set. Use the Order field to arrange; you can drag-and-drop in the Items list.', 'daily-quotes' ); ?></li>
-			<li><?php echo esc_html__( 'Insert the Gutenberg block or use the shortcode to display a quote.', 'daily-quotes' ); ?></li>
-		</ol>
-
-		<h2><?php echo esc_html__( 'Shortcode', 'daily-quotes' ); ?></h2>
-		<pre><code>[daily_quotes set="Your Set Title" randomize="1" per_day="1"]</code></pre>
-		<ul>
-			<li><code>set</code> — <?php echo esc_html__( 'Set title or ID', 'daily-quotes' ); ?></li>
-			<li><code>randomize</code> — <?php echo esc_html__( '1 to pick randomly among remaining; 0 for next in order', 'daily-quotes' ); ?></li>
-			<li><code>per_day</code> — <?php echo esc_html__( '1 to pin one item per day site‑wide; 0 to rotate on each render', 'daily-quotes' ); ?></li>
-		</ul>
-
-		<h2><?php echo esc_html__( 'Block', 'daily-quotes' ); ?></h2>
-		<p><?php echo esc_html__( 'Add the “Daily Quote” block. In the sidebar, choose Set, Randomize, and Pin One Per Day. Optional styles: text/background color, font size/family, padding, margin, text alignment, border (color/width/style/radius), and wide/full alignment.', 'daily-quotes' ); ?></p>
-
-		<h2><?php echo esc_html__( 'Rotation rules', 'daily-quotes' ); ?></h2>
-		<ul>
-			<li><?php echo esc_html__( 'No repeats until all items in the set are shown, then cycle restarts.', 'daily-quotes' ); ?></li>
-			<li><?php echo esc_html__( 'When “Pin One Per Day” is enabled, today’s item is fixed using the site timezone.', 'daily-quotes' ); ?></li>
-		</ul>
-
-		<hr />
-		<p><strong><?php echo esc_html__( 'Author', 'daily-quotes' ); ?>:</strong> <?php echo esc_html( $author ); ?> &nbsp; | &nbsp; <strong><?php echo esc_html__( 'Version', 'daily-quotes' ); ?>:</strong> <?php echo esc_html( $version ); ?> &nbsp; | &nbsp; <strong><?php echo esc_html__( 'Last updated', 'daily-quotes' ); ?>:</strong> <?php echo esc_html( $last_updated ); ?></p>
+		<div class="dq-about-page">
+			<?php echo $html_content; ?>
+			
+			<hr style="margin: 30px 0;" />
+		</div>
 	</div>
+	
+	<style>
+	.dq-about-page h1 { color: #23282d; border-bottom: 1px solid #ddd; padding-bottom: 10px; }
+	.dq-about-page h2 { color: #0073aa; margin-top: 25px; }
+	.dq-about-page h3 { color: #23282d; }
+	.dq-about-page code { background: #f1f1f1; padding: 2px 6px; border-radius: 3px; font-family: monospace; }
+	.dq-about-page pre { background: #f1f1f1; padding: 15px; border-radius: 5px; overflow-x: auto; }
+	.dq-about-page pre code { background: none; padding: 0; }
+	.dq-about-page ul, .dq-about-page ol { margin-left: 0px; }
+	.dq-about-page li { margin-bottom: 5px; }
+	.dq-about-page blockquote { border-left: 4px solid #0073aa; padding-left: 15px; margin-left: 0; font-style: italic; }
+	</style>
 	<?php
+}
+
+/**
+ * Basic Markdown to HTML converter for README content
+ */
+function dq_convert_markdown_to_html( $markdown ) {
+	// Convert headers
+	$markdown = preg_replace( '/^### (.*$)/m', '<h3>$1</h3>', $markdown );
+	$markdown = preg_replace( '/^## (.*$)/m', '<h2>$1</h2>', $markdown );
+	$markdown = preg_replace( '/^# (.*$)/m', '<h1>$1</h1>', $markdown );
+	
+	// Convert code blocks
+	$markdown = preg_replace( '/```(.*?)```/s', '<pre><code>$1</code></pre>', $markdown );
+	
+	// Convert inline code
+	$markdown = preg_replace( '/`([^`]+)`/', '<code>$1</code>', $markdown );
+	
+	// Convert bold
+	$markdown = preg_replace( '/\*\*(.*?)\*\*/', '<strong>$1</strong>', $markdown );
+	
+	// Convert italic
+	$markdown = preg_replace( '/\*(.*?)\*/', '<em>$1</em>', $markdown );
+	
+	// Convert lists
+	$markdown = preg_replace( '/^\- (.*$)/m', '<li>$1</li>', $markdown );
+	$markdown = preg_replace( '/^(\d+)\. (.*$)/m', '<li>$2</li>', $markdown );
+
+	//$markdown = preg_replace( '/^\- (.*$)/m', '$1<br />', $markdown );
+	//$markdown = preg_replace( '/^(\d+)\. (.*$)/m', '$2<BR />', $markdown );
+
+	
+	// Wrap consecutive list items in ul/ol
+	//$markdown = preg_replace( '/(<li>.*<\/li>)/s', '<ul>$1</ul>', $markdown );
+	
+	// Convert line breaks to paragraphs
+	$markdown = preg_replace( '/\n\n/', '</p><p>', $markdown );
+	$markdown = '<p>' . $markdown . '</p>';
+	
+	// Clean up empty paragraphs
+	$markdown = preg_replace( '/<p><\/p>/', '', $markdown );
+	$markdown = preg_replace( '/<p>\s*<\/p>/', '', $markdown );
+	
+	return $markdown;
 }
 
 /**

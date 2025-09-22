@@ -101,6 +101,10 @@ daily-quotes/
 - WordPress 5.0+ (for Gutenberg block support)
 - PHP 7.4+
 
+## Known Bugs
+
+- **Block Selection Issue**: Daily Quotes block is not selectable by clicking in the visual editor. **Workaround**: Use the Document Navigator (List View) to select the block instead.
+
 ## Changelog
 
 ### Version 0.2.0
