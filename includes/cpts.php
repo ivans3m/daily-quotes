@@ -351,9 +351,9 @@ function dq_render_about_page() {
 	.dq-about-page h1 { color: #23282d; border-bottom: 1px solid #ddd; padding-bottom: 10px; }
 	.dq-about-page h2 { color: #0073aa; margin-top: 25px; }
 	.dq-about-page h3 { color: #23282d; }
-	.dq-about-page code { background: #f1f1f1; padding: 2px 6px; border-radius: 3px; font-family: monospace; }
-	.dq-about-page pre { background: #f1f1f1; padding: 15px; border-radius: 5px; overflow-x: auto; }
-	.dq-about-page pre code { background: none; padding: 0; }
+	.dq-about-page code { background: #fff; padding: 2px 6px; font-family: monospace; }
+	.dq-about-page pre { background: #fff; padding: 15px; border-radius: 5px; overflow-x: auto; border: 1px solid #ddd; }
+	.dq-about-page pre code { padding: 0; }
 	.dq-about-page ul, .dq-about-page ol { margin-left: 0px; }
 	.dq-about-page li { margin-bottom: 5px; }
 	.dq-about-page blockquote { border-left: 4px solid #0073aa; padding-left: 15px; margin-left: 0; font-style: italic; }
